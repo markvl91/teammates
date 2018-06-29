@@ -1,142 +1,32 @@
 package teammates.ui.pagedata;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import com.google.appengine.api.datastore.Text;
-
 import teammates.common.datatransfer.FeedbackParticipantType;
 import teammates.common.datatransfer.FeedbackSessionResultsBundle;
-import teammates.common.datatransfer.attributes.AccountAttributes;
-import teammates.common.datatransfer.attributes.FeedbackQuestionAttributes;
-import teammates.common.datatransfer.attributes.FeedbackResponseAttributes;
-import teammates.common.datatransfer.attributes.FeedbackResponseCommentAttributes;
-import teammates.common.datatransfer.attributes.InstructorAttributes;
+import teammates.common.datatransfer.attributes.*;
 import teammates.common.datatransfer.questions.FeedbackQuestionDetails;
-import teammates.common.util.Assumption;
-import teammates.common.util.Const;
-import teammates.common.util.FieldValidator;
-import teammates.common.util.StringHelper;
-import teammates.common.util.Url;
+import teammates.common.util.*;
 import teammates.ui.datatransfer.InstructorFeedbackResultsPageViewType;
-import teammates.ui.template.ElementTag;
-import teammates.ui.template.FeedbackResponseCommentRow;
-import teammates.ui.template.FeedbackSessionPublishButton;
-import teammates.ui.template.InstructorFeedbackResultsFilterPanel;
-import teammates.ui.template.InstructorFeedbackResultsGroupByParticipantPanel;
-import teammates.ui.template.InstructorFeedbackResultsGroupByQuestionPanel;
-import teammates.ui.template.InstructorFeedbackResultsModerationButton;
-import teammates.ui.template.InstructorFeedbackResultsNoResponsePanel;
-import teammates.ui.template.InstructorFeedbackResultsParticipantPanel;
-import teammates.ui.template.InstructorFeedbackResultsQuestionTable;
-import teammates.ui.template.InstructorFeedbackResultsRemindButton;
-import teammates.ui.template.InstructorFeedbackResultsResponsePanel;
-import teammates.ui.template.InstructorFeedbackResultsResponseRow;
-import teammates.ui.template.InstructorFeedbackResultsSecondaryParticipantPanelBody;
-import teammates.ui.template.InstructorFeedbackResultsSectionPanel;
-import teammates.ui.template.InstructorFeedbackResultsSessionPanel;
+import teammates.ui.template.*;
 
-public class InstructorFeedbackResultsPageData extends PageData {
-    protected static final String MODERATE_RESPONSES_FOR_GIVER = "Moderate Responses";
-    protected static final String MODERATE_SINGLE_RESPONSE = "Moderate Response";
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.regex.Matcher;
 
-    protected static final int RESPONDENTS_LIMIT_FOR_AUTOLOADING = 150;
+public class InstructorFeedbackResultsPageDataBySectionGiverRecipientQuestion
+        extends InstructorFeedbackResultsPageDataBySection {
 
-    protected static int sectionId;
-    protected static Pattern sectionIdPattern = Pattern.compile("^section-(\\d+)");
-
-    // isLargeNumberOfRespondents is an attribute used for testing the ui, for ViewType.Question
-    protected boolean isLargeNumberOfRespondents;
-
-    protected FeedbackSessionResultsBundle bundle;
-    protected InstructorAttributes instructor;
-    protected List<String> sections;
-    protected String selectedSection;
-    protected String sortType;
-    protected String groupByTeam;
-    protected String showStats;
-    protected boolean isMissingResponsesShown;
-    protected int startIndex = -1;
-
-    protected FieldValidator validator = new FieldValidator();
-    protected String feedbackSessionName;
-
-    protected String displayableFsName;
-    protected String displayableCourseId;
-
-    // used for html table ajax loading
-    protected String ajaxStatus;
-    protected String sessionResultsHtmlTableAsString;
-
-    // for question view
-    protected List<InstructorFeedbackResultsQuestionTable> questionPanels;
-    // for giver > question > recipient, recipient > question > giver,
-    // giver > recipient > question, recipient > giver > question
-    protected Map<String, InstructorFeedbackResultsSectionPanel> sectionPanels;
-
-    protected Map<FeedbackQuestionAttributes, FeedbackQuestionDetails> questionToDetailsMap = new HashMap<>();
-    protected Map<String, String> profilePictureLinks = new HashMap<>();
-
-    // TODO multiple page data classes inheriting this for each view type,
-    // rather than an enum determining behavior in many methods
-    protected InstructorFeedbackResultsPageViewType viewType;
-
-    public InstructorFeedbackResultsPageData(AccountAttributes account, String sessionToken) {
+    public InstructorFeedbackResultsPageDataBySectionGiverRecipientQuestion(
+            AccountAttributes account, String sessionToken) {
         super(account, sessionToken);
     }
 
-    public void initialize(
-            InstructorAttributes instructor,
-            String selectedSection, String showStats,
-            String groupByTeam, InstructorFeedbackResultsPageViewType view,
-            boolean isMissingResponsesShown) {
-        // Nothing to initialize
-    }
+    protected void initializeForSectionViewType(String selectedSection) {
+        Map<String, Map<String, List<FeedbackResponseAttributes>>> sortedResponsesForGrq =
+                bundle.getResponsesSortedByGiverRecipientQuestion(true);
 
-    protected void initCommonVariables(
-            InstructorAttributes instructor, String selectedSection,
-            String showStats, String groupByTeam, boolean isMissingResponsesShown,
-            InstructorFeedbackResultsPageViewType viewType) {
-        Assumption.assertNotNull(bundle);
-        this.viewType = viewType;
-        this.sortType = viewType.toString();
-
-        this.instructor = instructor;
-        this.selectedSection = selectedSection;
-        this.showStats = showStats;
-        this.groupByTeam = groupByTeam;
-        this.isMissingResponsesShown = isMissingResponsesShown;
-
-        for (FeedbackQuestionAttributes question : bundle.questions.values()) {
-            FeedbackQuestionDetails questionDetails = question.getQuestionDetails();
-            questionToDetailsMap.put(question, questionDetails);
-        }
-
-        this.sections = getSectionsFromBundle();
-
-        displayableFsName = sanitizeForHtml(bundle.feedbackSession.getFeedbackSessionName());
-        displayableCourseId = sanitizeForHtml(bundle.feedbackSession.getCourseId());
-    }
-
-    private List<String> getSectionsFromBundle() {
-        List<String> sectionNames = new ArrayList<>();
-        for (String section : bundle.sectionsInCourse()) {
-            if (!section.equals(Const.DEFAULT_SECTION)) {
-                sectionNames.add(section);
-            }
-        }
-
-        sectionNames.sort(null);
-        return sectionNames;
+        buildSectionPanelForViewByParticipantParticipantQuestion(selectedSection,
+                sortedResponsesForGrq, viewType.additionalInfoId());
     }
 
     private void buildSectionPanelForViewByParticipantParticipantQuestion(
@@ -323,7 +213,7 @@ public class InstructorFeedbackResultsPageData extends PageData {
         List<InstructorFeedbackResultsSecondaryParticipantPanelBody> secondaryParticipantPanels = new ArrayList<>();
 
         int secondaryParticipantIndex = 0;
-        for (Map.Entry<String, List<FeedbackResponseAttributes>> secondaryParticipantResponses
+        for (Entry<String, List<FeedbackResponseAttributes>> secondaryParticipantResponses
                 : secondaryParticipantToResponsesMap.entrySet()) {
             secondaryParticipantIndex += 1;
             String secondaryParticipantIdentifier = secondaryParticipantResponses.getKey();
@@ -621,13 +511,6 @@ public class InstructorFeedbackResultsPageData extends PageData {
                     new InstructorFeedbackResultsSectionPanel(section, section, true);
             sectionPanels.put(section, sectionPanel);
         }
-    }
-
-    protected int getSectionPosition(String name) {
-        List<String> sections = getSectionsFromBundle();
-        sections.add(0, Const.DEFAULT_SECTION);
-
-        return sections.indexOf(name);
     }
 
     private void buildSectionPanelWithErrorMessage() {
@@ -1557,13 +1440,6 @@ public class InstructorFeedbackResultsPageData extends PageData {
                 nextUrl);
         remindParticularStudentsLink = addSessionTokenToUrl(remindParticularStudentsLink);
         return remindParticularStudentsLink;
-    }
-
-    @Override
-    public String getStudentProfilePictureLink(String studentEmail, String courseId) {
-        return profilePictureLinks.computeIfAbsent(studentEmail,
-                key -> super.getStudentProfilePictureLink(StringHelper.encrypt(key),
-                        StringHelper.encrypt(courseId)));
     }
 
     public void setBundle(FeedbackSessionResultsBundle bundle) {

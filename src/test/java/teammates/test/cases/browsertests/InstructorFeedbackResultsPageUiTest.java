@@ -277,7 +277,7 @@ public class InstructorFeedbackResultsPageUiTest extends BaseUiTestCase {
 
         /*
          * Omitted as unable to check both forward and reverse order in one go
-         * TODO: split up verifySortingOrder to enable this test
+         * TODO: split up verifySortingOrder to enable this testquestion/section
         verifySortingOrder(By.id("button_sortToTeam"),
                 "Team 2{*}Team 3",
                 "Team 1</td></div>'\"{*}Team 2",
