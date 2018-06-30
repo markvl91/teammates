@@ -1,8 +1,6 @@
 package teammates.ui.pagedata;
 
-import com.google.appengine.api.datastore.Text;
 import teammates.common.datatransfer.FeedbackParticipantType;
-import teammates.common.datatransfer.FeedbackSessionResultsBundle;
 import teammates.common.datatransfer.attributes.*;
 import teammates.common.datatransfer.questions.FeedbackQuestionDetails;
 import teammates.common.util.*;
@@ -28,6 +26,7 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
      * {@code bundle} should be set before this method
      * TODO: simplify the logic in this method
      */
+    @Override
     public void initialize(
             InstructorAttributes instructor,
             String selectedSection, String showStats,
@@ -39,7 +38,7 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
         // results page to be loaded by ajax
         if (isAllSectionsSelected()) {
             if (bundle.isComplete) {
-                buildSectionPanelsForForAjaxLoading(getSections(), viewType);
+                buildSectionPanelsForForAjaxLoading(getSections());
             } else {
                 buildSectionPanelWithErrorMessage();
             }
@@ -58,9 +57,9 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
 
     }
 
-    abstract protected void initializeForSectionViewType(String selectedSection);
+    protected abstract void initializeForSectionViewType(String selectedSection);
 
-    private void buildSectionPanelForViewByParticipantParticipantQuestion(
+    protected void buildSectionPanelForViewByParticipantParticipantQuestion(
             String section,
             Map<String, Map<String, List<FeedbackResponseAttributes>>> sortedResponses,
             String additionalInfoId) {
@@ -133,7 +132,7 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
      *
      * <p>Also builds team statistics tables for every team.
      */
-    private void buildSectionPanelForViewByParticipantQuestionParticipant(
+    protected void buildSectionPanelForViewByParticipantQuestionParticipant(
             String section,
             Map<String, Map<FeedbackQuestionAttributes,
                     List<FeedbackResponseAttributes>>> sortedResponses, String additionalInfoId) {
@@ -421,48 +420,10 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
         finalizeBuildingSectionPanel(sectionPanel, sectionName, emptyResponseMap, emptyTeamList);
     }
 
-    private void finalizeBuildingSectionPanel(
+    protected abstract void finalizeBuildingSectionPanel(
             InstructorFeedbackResultsSectionPanel sectionPanel, String sectionName,
             Map<String, Map<FeedbackQuestionAttributes, List<FeedbackResponseAttributes>>> responsesGroupedByTeam,
-            Set<String> teamsWithResponses) {
-        switch (viewType) {
-            case GIVER_QUESTION_RECIPIENT:
-            case RECIPIENT_QUESTION_GIVER:
-                prepareHeadersForTeamPanelsInSectionPanel(sectionPanel);
-                if (!responsesGroupedByTeam.isEmpty()) {
-                    buildTeamsStatisticsTableForSectionPanel(sectionPanel, responsesGroupedByTeam,
-                            teamsWithResponses);
-                }
-
-                Map<String, Boolean> isTeamDisplayingStatistics = new HashMap<>();
-                for (String team : teamsWithResponses) {
-                    // teamsWithResponses can include teams of anonymous student ("Anonymous student #'s Team")
-                    // and "-"
-                    isTeamDisplayingStatistics.put(team, isTeamVisible(team));
-                }
-                sectionPanel.setDisplayingTeamStatistics(isTeamDisplayingStatistics);
-                sectionPanel.setSectionName(sectionName);
-                sectionPanel.setSectionNameForDisplay(sectionName.equals(Const.DEFAULT_SECTION)
-                        ? Const.NO_SPECIFIC_SECTION
-                        : sectionName);
-                break;
-            case RECIPIENT_GIVER_QUESTION:
-            case GIVER_RECIPIENT_QUESTION:
-
-                sectionPanel.setSectionName(sectionName);
-                sectionPanel.setSectionNameForDisplay(sectionName.equals(Const.DEFAULT_SECTION)
-                        ? Const.NO_SPECIFIC_SECTION
-                        : sectionName);
-                break;
-            default:
-                Assumption.fail();
-                break;
-        }
-    }
-
-    private boolean isTeamVisible(String team) {
-        return bundle.rosterTeamNameMembersTable.containsKey(team);
-    }
+            Set<String> teamsWithResponses);
 
     private void buildMissingTeamAndParticipantPanelsForSection(
             InstructorFeedbackResultsSectionPanel sectionPanel, String sectionName,
@@ -486,20 +447,6 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
             }
         }
 
-    }
-
-    private static String getCurrentTeam(FeedbackSessionResultsBundle bundle, String giverIdentifier) {
-        String currentTeam;
-        if (bundle.isParticipantIdentifierInstructor(giverIdentifier)) {
-            currentTeam = Const.USER_TEAM_FOR_INSTRUCTOR;
-        } else {
-            currentTeam = bundle.getTeamNameForEmail(giverIdentifier);
-            if (currentTeam.isEmpty()) {
-                currentTeam = bundle.getNameForEmail(giverIdentifier);
-            }
-        }
-
-        return currentTeam;
     }
 
     private void buildMissingParticipantPanelsForTeam(
@@ -527,10 +474,10 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
     }
 
     private void buildSectionPanelsForForAjaxLoading(
-            List<String> sections, InstructorFeedbackResultsPageViewType viewType) {
+            List<String> sections) {
         sectionPanels = new LinkedHashMap<>();
 
-        if (hasEntitiesInNoSpecificSection(viewType)) {
+        if (hasEntitiesInNoSpecificSection()) {
             InstructorFeedbackResultsSectionPanel sectionPanel =
                     new InstructorFeedbackResultsSectionPanel(Const.DEFAULT_SECTION, Const.NO_SPECIFIC_SECTION, true);
 
@@ -553,437 +500,9 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
         sectionPanel.setAbleToLoadResponses(false);
 
         sectionPanels.put(selectedSection, sectionPanel);
-
     }
 
-    /**
-     * Builds participant panels for the specified team, and add to sectionPanel.
-     */
-    private void addMissingParticipantsPanelsWithModerationButtonForTeam(
-            InstructorFeedbackResultsSectionPanel sectionPanel,
-            String teamName, List<String> teamMembers) {
-        for (String teamMember : teamMembers) {
-            InstructorFeedbackResultsModerationButton moderationButton =
-                    buildModerationButtonForGiver(null, teamMember, "btn btn-default btn-xs",
-                            MODERATE_RESPONSES_FOR_GIVER);
-            InstructorFeedbackResultsParticipantPanel giverPanel;
-
-            if (viewType.isSecondaryGroupingOfParticipantType()) {
-
-                String teamMemberNameWithTeamNameAppended = bundle.getFullNameFromRoster(teamMember)
-                        + " (" + bundle.getTeamNameFromRoster(teamMember) + ")";
-                giverPanel = buildInstructorFeedbackResultsGroupBySecondaryParticipantPanel(
-                        teamMember, teamMemberNameWithTeamNameAppended,
-                        new ArrayList<InstructorFeedbackResultsSecondaryParticipantPanelBody>(),
-                        moderationButton);
-            } else {
-                giverPanel = new InstructorFeedbackResultsGroupByQuestionPanel(
-                        teamMember, bundle.getFullNameFromRoster(teamMember),
-                        new ArrayList<InstructorFeedbackResultsQuestionTable>(),
-                        getStudentProfilePictureLink(teamMember, instructor.courseId),
-                        viewType.isPrimaryGroupingOfGiverType(), moderationButton);
-            }
-
-            giverPanel.setHasResponses(false);
-            sectionPanel.addParticipantPanel(teamName, giverPanel);
-        }
-    }
-
-    private void addMissingParticipantsPanelsWithoutModerationButtonForTeam(
-            InstructorFeedbackResultsSectionPanel sectionPanel,
-            String teamName, List<String> teamMembers) {
-        for (String teamMember : teamMembers) {
-
-            InstructorFeedbackResultsParticipantPanel giverPanel;
-
-            if (viewType.isSecondaryGroupingOfParticipantType()) {
-                String teamMemberWithTeamNameAppended = bundle.getFullNameFromRoster(teamMember)
-                        + " (" + bundle.getTeamNameFromRoster(teamMember) + ")";
-                giverPanel = buildInstructorFeedbackResultsGroupBySecondaryParticipantPanel(
-                        teamMember, teamMemberWithTeamNameAppended,
-                        new ArrayList<InstructorFeedbackResultsSecondaryParticipantPanelBody>(),
-                        null);
-
-            } else {
-                giverPanel = new InstructorFeedbackResultsGroupByQuestionPanel(
-                        new ArrayList<InstructorFeedbackResultsQuestionTable>(),
-                        getStudentProfilePictureLink(teamMember, instructor.courseId),
-                        viewType.isPrimaryGroupingOfGiverType(), teamMember,
-                        bundle.getFullNameFromRoster(teamMember));
-            }
-            giverPanel.setHasResponses(false);
-
-            sectionPanel.addParticipantPanel(teamName, giverPanel);
-        }
-    }
-
-    /**
-     * Constructs InstructorFeedbackResultsQuestionTable containing statistics for each team.
-     * The statistics tables are added to the sectionPanel.
-     */
-    private void buildTeamsStatisticsTableForSectionPanel(
-            InstructorFeedbackResultsSectionPanel sectionPanel,
-            Map<String, Map<FeedbackQuestionAttributes, List<FeedbackResponseAttributes>>> responsesGroupedByTeam,
-            Set<String> teamsInSection) {
-        Map<String, List<InstructorFeedbackResultsQuestionTable>> teamToStatisticsTables = new HashMap<>();
-        for (String team : teamsInSection) {
-            // skip team if no responses,
-            // or if the team is an anonymous student's team or an anonymous team, or is "-"
-            if (!responsesGroupedByTeam.containsKey(team) || !isTeamVisible(team)) {
-                continue;
-            }
-
-            List<InstructorFeedbackResultsQuestionTable> statisticsTablesForTeam = new ArrayList<>();
-
-            for (FeedbackQuestionAttributes question : bundle.questions.values()) {
-                if (!responsesGroupedByTeam.get(team).containsKey(question)) {
-                    continue;
-                }
-
-                List<FeedbackResponseAttributes> responsesForTeamAndQuestion =
-                        responsesGroupedByTeam.get(team).get(question);
-
-                InstructorFeedbackResultsQuestionTable statsTable = buildQuestionTableWithoutResponseRows(
-                        question, responsesForTeamAndQuestion,
-                        "");
-                statsTable.setCollapsible(false);
-
-                if (!statsTable.getQuestionStatisticsTable().isEmpty()) {
-                    statisticsTablesForTeam.add(statsTable);
-                }
-            }
-
-            InstructorFeedbackResultsQuestionTable.sortByQuestionNumber(statisticsTablesForTeam);
-            teamToStatisticsTables.put(team, statisticsTablesForTeam);
-        }
-
-        sectionPanel.setTeamStatisticsTable(teamToStatisticsTables);
-    }
-
-    private void prepareHeadersForTeamPanelsInSectionPanel(
-            InstructorFeedbackResultsSectionPanel sectionPanel) {
-        switch (viewType) {
-            case GIVER_QUESTION_RECIPIENT:
-                sectionPanel.setStatisticsHeaderText("Statistics for Given Responses");
-                sectionPanel.setDetailedResponsesHeaderText("Detailed Responses");
-                break;
-            case RECIPIENT_QUESTION_GIVER:
-                sectionPanel.setStatisticsHeaderText("Statistics for Received Responses");
-                sectionPanel.setDetailedResponsesHeaderText("Detailed Responses");
-                break;
-            default:
-                Assumption.fail("There should be no headers for the view type");
-                break;
-        }
-    }
-
-    private InstructorFeedbackResultsQuestionTable buildQuestionTableAndResponseRows(
-            FeedbackQuestionAttributes question,
-            List<FeedbackResponseAttributes> responses,
-            String additionalInfoId) {
-        return buildQuestionTableAndResponseRows(question, responses, additionalInfoId,
-                null, true);
-    }
-
-    /**
-     * Builds question tables without response rows, but with stats.
-     *
-     * @param responses responses to compute statistics for
-     */
-    private InstructorFeedbackResultsQuestionTable buildQuestionTableWithoutResponseRows(
-            FeedbackQuestionAttributes question,
-            List<FeedbackResponseAttributes> responses,
-            String additionalInfoId) {
-        return buildQuestionTableAndResponseRows(question, responses, additionalInfoId,
-                null, false);
-    }
-
-    /**
-     * Builds a question table for given question, and response rows for the given responses.
-     *
-     * @param participantIdentifier for viewTypes * > Question > *, constructs missing response rows
-     *                              only for the given participant
-     * @param isShowingResponseRows if false, hides the response rows
-     */
-    private InstructorFeedbackResultsQuestionTable buildQuestionTableAndResponseRows(
-            FeedbackQuestionAttributes question,
-            List<FeedbackResponseAttributes> responses,
-            String additionalInfoId,
-            String participantIdentifier, boolean isShowingResponseRows) {
-
-        List<ElementTag> columnTags = new ArrayList<>();
-        Map<String, Boolean> isSortable = new HashMap<>();
-        boolean isCollapsible = true;
-        List<InstructorFeedbackResultsResponseRow> responseRows = null;
-
-        FeedbackQuestionDetails questionDetails = questionToDetailsMap.get(question);
-        if (isShowingResponseRows) {
-            switch (viewType) {
-                case QUESTION:
-                    buildTableColumnHeaderForQuestionView(columnTags, isSortable);
-                    responseRows = buildResponseRowsForQuestion(question, responses);
-                    break;
-                case GIVER_QUESTION_RECIPIENT:
-                    buildTableColumnHeaderForGiverQuestionRecipientView(columnTags, isSortable);
-                    responseRows =
-                            buildResponseRowsForQuestionForSingleGiver(question, responses, participantIdentifier);
-                    isCollapsible = false;
-                    break;
-                case RECIPIENT_QUESTION_GIVER:
-                    buildTableColumnHeaderForRecipientQuestionGiverView(columnTags, isSortable);
-                    responseRows =
-                            buildResponseRowsForQuestionForSingleRecipient(question, responses, participantIdentifier);
-                    isCollapsible = false;
-                    break;
-                default:
-                    Assumption.fail("View type should not involve question tables");
-                    break;
-            }
-
-            // If question specific sorting is not needed, responses are sorted
-            // by default order (first by team name, then by display name)
-            if (questionDetails.isQuestionSpecificSortingRequired()) {
-                responseRows.sort(questionDetails.getResponseRowsSortOrder());
-            } else {
-                responseRows = InstructorFeedbackResultsResponseRow.sortListWithDefaultOrder(responseRows);
-            }
-
-        }
-
-        String studentEmail = student == null ? null : student.email;
-        String statisticsTable = questionDetails.getQuestionResultStatisticsHtml(responses, question, studentEmail,
-                bundle, viewType.toString());
-
-        String questionText = questionDetails.getQuestionText();
-        String additionalInfoText =
-                questionDetails.getQuestionAdditionalInfoHtml(question.questionNumber, additionalInfoId);
-
-        InstructorFeedbackResultsQuestionTable questionTable = new InstructorFeedbackResultsQuestionTable(
-                !responses.isEmpty(), statisticsTable,
-                responseRows, question,
-                questionText, additionalInfoText,
-                columnTags, isSortable);
-        if (viewType == InstructorFeedbackResultsPageViewType.QUESTION) {
-            // setup classes, for loading responses by ajax
-            // ajax_submit: user needs to click on the panel to load
-            // ajax_auto: responses are loaded automatically
-            questionTable.setAjaxClass(isLargeNumberOfResponses()
-                    ? " ajax_submit"
-                    : " ajax_auto");
-        }
-        questionTable.setShowResponseRows(isShowingResponseRows);
-        questionTable.setCollapsible(isCollapsible);
-
-        return questionTable;
-    }
-
-    private void buildTableColumnHeaderForQuestionView(
-            List<ElementTag> columnTags,
-            Map<String, Boolean> isSortable) {
-        ElementTag giverTeamElement =
-                new ElementTag("Team", "id", "button_sortFromTeam", "class", "button-sort-none toggle-sort",
-                        "style", "width: 10%; min-width: 67px;");
-        ElementTag giverElement =
-                new ElementTag("Giver", "id", "button_sortFromName", "class", "button-sort-none toggle-sort",
-                        "style", "width: 10%; min-width: 65px;");
-        ElementTag recipientTeamElement =
-                new ElementTag("Team", "id", "button_sortToTeam", "class", "button-sort-ascending toggle-sort",
-                        "style", "width: 10%; min-width: 67px;");
-        ElementTag recipientElement =
-                new ElementTag("Recipient", "id", "button_sortToName", "class", "button-sort-none toggle-sort",
-                        "style", "width: 10%; min-width: 90px;");
-        ElementTag responseElement =
-                new ElementTag("Feedback", "id", "button_sortFeedback", "class", "button-sort-none toggle-sort",
-                        "style", "width: 45%; min-width: 95px;");
-        ElementTag actionElement = new ElementTag("Actions", "class", "action-header",
-                "style", "width: 15%; min-width: 75px;");
-
-        columnTags.add(giverTeamElement);
-        columnTags.add(giverElement);
-        columnTags.add(recipientTeamElement);
-        columnTags.add(recipientElement);
-        columnTags.add(responseElement);
-        columnTags.add(actionElement);
-
-        isSortable.put(giverElement.getContent(), true);
-        isSortable.put(giverTeamElement.getContent(), true);
-        isSortable.put(recipientElement.getContent(), true);
-        isSortable.put(responseElement.getContent(), true);
-        isSortable.put(actionElement.getContent(), false);
-    }
-
-    private void buildTableColumnHeaderForGiverQuestionRecipientView(
-            List<ElementTag> columnTags,
-            Map<String, Boolean> isSortable) {
-        ElementTag photoElement = new ElementTag("Photo");
-        ElementTag recipientTeamElement =
-                new ElementTag("Team", "id", "button_sortFromTeam", "class", "button-sort-ascending toggle-sort",
-                        "style", "width: 15%; min-width: 67px;");
-        ElementTag recipientElement =
-                new ElementTag("Recipient", "id", "button_sortTo", "class", "button-sort-none toggle-sort",
-                        "style", "width: 15%; min-width: 90px;");
-        ElementTag responseElement =
-                new ElementTag("Feedback", "id", "button_sortFeedback", "class", "button-sort-none toggle-sort",
-                        "style", "min-width: 95px;");
-
-        columnTags.add(photoElement);
-        columnTags.add(recipientTeamElement);
-        columnTags.add(recipientElement);
-        columnTags.add(responseElement);
-
-        isSortable.put(photoElement.getContent(), false);
-        isSortable.put(recipientTeamElement.getContent(), true);
-        isSortable.put(recipientElement.getContent(), true);
-        isSortable.put(responseElement.getContent(), true);
-    }
-
-    private void buildTableColumnHeaderForRecipientQuestionGiverView(
-            List<ElementTag> columnTags,
-            Map<String, Boolean> isSortable) {
-        ElementTag photoElement = new ElementTag("Photo");
-        ElementTag giverTeamElement =
-                new ElementTag("Team", "id", "button_sortFromTeam", "class", "button-sort-ascending toggle-sort",
-                        "style", "width: 15%; min-width: 67px;");
-        ElementTag giverElement =
-                new ElementTag("Giver", "id", "button_sortFromName", "class", "button-sort-none toggle-sort",
-                        "style", "width: 15%; min-width: 65px;");
-        ElementTag responseElement =
-                new ElementTag("Feedback", "id", "button_sortFeedback", "class", "button-sort-none toggle-sort",
-                        "style", "min-width: 95px;");
-        ElementTag actionElement = new ElementTag("Actions", "class", "action-header");
-
-        columnTags.add(photoElement);
-        columnTags.add(giverTeamElement);
-        columnTags.add(giverElement);
-        columnTags.add(responseElement);
-        columnTags.add(actionElement);
-
-        isSortable.put(photoElement.getContent(), false);
-        isSortable.put(giverTeamElement.getContent(), true);
-        isSortable.put(giverElement.getContent(), true);
-        isSortable.put(responseElement.getContent(), true);
-        isSortable.put(actionElement.getContent(), false);
-    }
-
-    /**
-     * Builds response rows for a given question. This not only builds response rows for existing responses, but
-     * includes
-     * the missing responses between pairs of givers and recipients.
-     *
-     * @param responses existing responses for the question
-     */
-    private List<InstructorFeedbackResultsResponseRow> buildResponseRowsForQuestion(
-            FeedbackQuestionAttributes question, List<FeedbackResponseAttributes> responses) {
-        List<InstructorFeedbackResultsResponseRow> responseRows = new ArrayList<>();
-
-        List<String> possibleGiversWithoutResponses = bundle.getPossibleGivers(question);
-        List<String> possibleReceiversWithoutResponsesForGiver = new ArrayList<>();
-
-        String prevGiver = "";
-        int responseRecipientIndex = 0;
-        int responseGiverIndex = 0;
-        int userIndex = 0;
-        Map<String, Integer> userIndexesForComments = new HashMap<String, Integer>();
-        for (FeedbackResponseAttributes response : responses) {
-            if (!bundle.isGiverVisible(response) || !bundle.isRecipientVisible(response)) {
-                possibleGiversWithoutResponses.clear();
-                possibleReceiversWithoutResponsesForGiver.clear();
-            }
-
-            // keep track of possible givers who did not give a response
-            removeParticipantIdentifierFromList(possibleGiversWithoutResponses, response.giver);
-
-            boolean isNewGiver = !prevGiver.equals(response.giver);
-            if (isNewGiver) {
-                if (isMissingResponsesShown) {
-                    responseRows.addAll(
-                            buildMissingResponseRowsBetweenGiverAndPossibleRecipients(
-                                    question, possibleReceiversWithoutResponsesForGiver, prevGiver,
-                                    bundle.getNameForEmail(prevGiver),
-                                    bundle.getTeamNameForEmail(prevGiver)));
-                }
-                String giverIdentifier = response.giver;
-
-                possibleReceiversWithoutResponsesForGiver = bundle.getPossibleRecipients(question, giverIdentifier);
-            }
-
-            // keep track of possible recipients without a response from the current giver
-            removeParticipantIdentifierFromList(possibleReceiversWithoutResponsesForGiver, response.recipient);
-            prevGiver = response.giver;
-
-            InstructorFeedbackResultsModerationButton moderationButton = buildModerationButtonForExistingResponse(
-                    question, response);
-            InstructorFeedbackResultsResponseRow responseRow = new InstructorFeedbackResultsResponseRow(
-                    bundle.getGiverNameForResponse(response),
-                    bundle.getTeamNameForEmail(response.giver),
-                    bundle.getRecipientNameForResponse(response),
-                    bundle.getTeamNameForEmail(response.recipient),
-                    bundle.getResponseAnswerHtml(response, question),
-                    moderationButton);
-            configureResponseRow(prevGiver, response.recipient, responseRow);
-            String giverName = bundle.getNameForEmail(response.giver);
-            String recipientName = bundle.getNameForEmail(response.recipient);
-
-            String giverTeam = bundle.getTeamNameForEmail(response.giver);
-            String recipientTeam = bundle.getTeamNameForEmail(response.recipient);
-
-            giverName = bundle.appendTeamNameToName(giverName, giverTeam);
-            recipientName = bundle.appendTeamNameToName(recipientName, recipientTeam);
-
-            List<FeedbackResponseCommentRow> comments =
-                    buildResponseComments(giverName, recipientName, question, response);
-            if (!comments.isEmpty()) {
-                responseRow.setCommentsOnResponses(comments);
-            }
-            Map<FeedbackParticipantType, Boolean> responseVisibilityMap = getResponseVisibilityMap(question);
-            boolean isCommentsOnResponsesAllowed =
-                    question.getQuestionDetails().isCommentsOnResponsesAllowed();
-            if (isCommentsOnResponsesAllowed) {
-                FeedbackResponseCommentRow addCommentForm = buildFeedbackResponseCommentAddForm(question, response,
-                        responseVisibilityMap, giverName, recipientName);
-                responseRow.setAddCommentButton(addCommentForm);
-                if (userIndexesForComments.get(response.giver) == null) {
-                    userIndex = generateIndexForUser(response.giver, userIndex, userIndexesForComments);
-                }
-                responseGiverIndex = userIndexesForComments.get(response.giver);
-                if (userIndexesForComments.get(response.recipient) == null) {
-                    userIndex = generateIndexForUser(response.recipient, userIndex, userIndexesForComments);
-                }
-                responseRecipientIndex = userIndexesForComments.get(response.recipient);
-
-                responseRow.setResponseRecipientIndex(responseRecipientIndex);
-                responseRow.setResponseGiverIndex(responseGiverIndex);
-                responseRow.setCommentsOnResponsesAllowed(isCommentsOnResponsesAllowed);
-            }
-            responseRows.add(responseRow);
-        }
-
-        if (!responses.isEmpty()) {
-            responseRows.addAll(getRemainingMissingResponseRows(question, possibleGiversWithoutResponses,
-                    possibleReceiversWithoutResponsesForGiver,
-                    prevGiver));
-        }
-
-        return responseRows;
-    }
-
-    private List<InstructorFeedbackResultsResponseRow>
-    buildResponseRowsForQuestionForSingleGiver(
-            FeedbackQuestionAttributes question,
-            List<FeedbackResponseAttributes> responses,
-            String giverIdentifier) {
-        return buildResponseRowsForQuestionForSingleParticipant(question, responses, giverIdentifier, true);
-    }
-
-    private List<InstructorFeedbackResultsResponseRow>
-    buildResponseRowsForQuestionForSingleRecipient(
-            FeedbackQuestionAttributes question,
-            List<FeedbackResponseAttributes> responses,
-            String recipientIdentifier) {
-        return buildResponseRowsForQuestionForSingleParticipant(question, responses, recipientIdentifier, false);
-    }
-
-    private List<InstructorFeedbackResultsResponseRow> buildResponseRowsForQuestionForSingleParticipant(
+    protected List<InstructorFeedbackResultsResponseRow> buildResponseRowsForQuestionForSingleParticipant(
             FeedbackQuestionAttributes question,
             List<FeedbackResponseAttributes> responses,
             String participantIdentifier, boolean isFirstGroupedByGiver) {
@@ -1040,82 +559,6 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
         return responseRows;
     }
 
-    private void configureResponseRow(
-            String giver, String recipient,
-            InstructorFeedbackResultsResponseRow responseRow) {
-        switch (viewType) {
-            case QUESTION:
-                responseRow.setGiverProfilePictureLink(getProfilePictureIfEmailValid(giver));
-                responseRow.setRecipientProfilePictureLink(getProfilePictureIfEmailValid(recipient));
-
-                responseRow.setActionsDisplayed(true);
-                break;
-            case GIVER_QUESTION_RECIPIENT:
-                responseRow.setGiverDisplayed(false);
-                responseRow.setGiverProfilePictureLink(null);
-                responseRow.setRecipientProfilePictureAColumn(true);
-
-                responseRow.setRecipientProfilePictureLink(getProfilePictureIfEmailValid(recipient));
-                responseRow.setActionsDisplayed(false);
-                break;
-            case RECIPIENT_QUESTION_GIVER:
-                responseRow.setRecipientDisplayed(false);
-                responseRow.setGiverProfilePictureAColumn(true);
-
-                responseRow.setGiverProfilePictureLink(getProfilePictureIfEmailValid(giver));
-                responseRow.setActionsDisplayed(true);
-                break;
-            default:
-                Assumption.fail();
-                break;
-        }
-    }
-
-    // TODO consider using Url in future
-    private String getProfilePictureIfEmailValid(String email) {
-        // TODO the check for determining whether to show a profile picture
-        // can be improved to use isStudent
-        boolean isEmailValid = validator.getInvalidityInfoForEmail(email).isEmpty();
-        return isEmailValid ? getStudentProfilePictureLink(email, instructor.courseId)
-                : null;
-    }
-
-    /**
-     * Construct missing response rows between the giver identified by {@code giverIdentifier} and
-     * {@code possibleReceivers}.
-     */
-    private List<InstructorFeedbackResultsResponseRow> buildMissingResponseRowsBetweenGiverAndPossibleRecipients(
-            FeedbackQuestionAttributes question,
-            List<String> possibleReceivers,
-            String giverIdentifier,
-            String giverName, String giverTeam) {
-        List<InstructorFeedbackResultsResponseRow> missingResponses = new ArrayList<>();
-        FeedbackQuestionDetails questionDetails = questionToDetailsMap.get(question);
-
-        for (String possibleRecipient : possibleReceivers) {
-            if (questionDetails.shouldShowNoResponseText(question)) {
-                String textToDisplay = questionDetails.getNoResponseTextInHtml(
-                        giverIdentifier, possibleRecipient, bundle, question);
-                String possibleRecipientName = bundle.getFullNameFromRoster(possibleRecipient);
-                String possibleRecipientTeam = bundle.getTeamNameFromRoster(possibleRecipient);
-
-                InstructorFeedbackResultsModerationButton moderationButton =
-                        buildModerationButtonForGiver(question, giverIdentifier, "btn btn-default btn-xs",
-                                MODERATE_SINGLE_RESPONSE);
-                InstructorFeedbackResultsResponseRow missingResponse =
-                        new InstructorFeedbackResultsResponseRow(
-                                giverName, giverTeam, possibleRecipientName, possibleRecipientTeam,
-                                textToDisplay, moderationButton, true);
-
-                missingResponse.setRowAttributes(new ElementTag("class", "pending_response_row"));
-                configureResponseRow(giverIdentifier, possibleRecipient, missingResponse);
-                missingResponses.add(missingResponse);
-            }
-        }
-
-        return missingResponses;
-    }
-
     /**
      * Construct missing response rows between the recipient identified by {@code recipientIdentifier} and
      * {@code possibleGivers}.
@@ -1154,97 +597,115 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
     }
 
     /**
-     * Given a participantIdentifier, remove it from participantIdentifierList.
+     * Builds participant panels for the specified team, and add to sectionPanel.
      */
-    private void removeParticipantIdentifierFromList(
-            List<String> participantIdentifierList, String participantIdentifier) {
-        participantIdentifierList.remove(participantIdentifier);
+    private void addMissingParticipantsPanelsWithModerationButtonForTeam(
+            InstructorFeedbackResultsSectionPanel sectionPanel,
+            String teamName, List<String> teamMembers) {
+        for (String teamMember : teamMembers) {
+            InstructorFeedbackResultsModerationButton moderationButton =
+                    buildModerationButtonForGiver(null, teamMember, "btn btn-default btn-xs",
+                            MODERATE_RESPONSES_FOR_GIVER);
+            InstructorFeedbackResultsParticipantPanel giverPanel;
+
+            if (viewType.isSecondaryGroupingOfParticipantType()) {
+
+                String teamMemberNameWithTeamNameAppended = bundle.getFullNameFromRoster(teamMember)
+                        + " (" + bundle.getTeamNameFromRoster(teamMember) + ")";
+                giverPanel = buildInstructorFeedbackResultsGroupBySecondaryParticipantPanel(
+                        teamMember, teamMemberNameWithTeamNameAppended,
+                        new ArrayList<>(),
+                        moderationButton);
+            } else {
+                giverPanel = new InstructorFeedbackResultsGroupByQuestionPanel(
+                        teamMember, bundle.getFullNameFromRoster(teamMember),
+                        new ArrayList<>(),
+                        getStudentProfilePictureLink(teamMember, instructor.courseId),
+                        viewType.isPrimaryGroupingOfGiverType(), moderationButton);
+            }
+
+            giverPanel.setHasResponses(false);
+            sectionPanel.addParticipantPanel(teamName, giverPanel);
+        }
     }
 
-    private List<InstructorFeedbackResultsResponseRow> getRemainingMissingResponseRows(
-            FeedbackQuestionAttributes question, List<String> remainingPossibleGivers,
-            List<String> possibleRecipientsForGiver, String prevGiver) {
-        List<InstructorFeedbackResultsResponseRow> responseRows = new ArrayList<>();
+    private void addMissingParticipantsPanelsWithoutModerationButtonForTeam(
+            InstructorFeedbackResultsSectionPanel sectionPanel,
+            String teamName, List<String> teamMembers) {
+        for (String teamMember : teamMembers) {
 
-        if (possibleRecipientsForGiver != null && isMissingResponsesShown) {
-            responseRows.addAll(buildMissingResponseRowsBetweenGiverAndPossibleRecipients(
-                    question, possibleRecipientsForGiver,
-                    prevGiver, bundle.getNameForEmail(prevGiver),
-                    bundle.getTeamNameForEmail(prevGiver)));
-        }
+            InstructorFeedbackResultsParticipantPanel giverPanel;
 
-        removeParticipantIdentifierFromList(remainingPossibleGivers, prevGiver);
+            if (viewType.isSecondaryGroupingOfParticipantType()) {
+                String teamMemberWithTeamNameAppended = bundle.getFullNameFromRoster(teamMember)
+                        + " (" + bundle.getTeamNameFromRoster(teamMember) + ")";
+                giverPanel = buildInstructorFeedbackResultsGroupBySecondaryParticipantPanel(
+                        teamMember, teamMemberWithTeamNameAppended,
+                        new ArrayList<>(),
+                        null);
 
-        for (String possibleGiverWithNoResponses : remainingPossibleGivers) {
-            if (!isAllSectionsSelected()
-                    && !bundle.getSectionFromRoster(possibleGiverWithNoResponses).equals(selectedSection)) {
-                continue;
+            } else {
+                giverPanel = new InstructorFeedbackResultsGroupByQuestionPanel(
+                        new ArrayList<>(),
+                        getStudentProfilePictureLink(teamMember, instructor.courseId),
+                        viewType.isPrimaryGroupingOfGiverType(), teamMember,
+                        bundle.getFullNameFromRoster(teamMember));
             }
-            List<String> possibleRecipientsForRemainingGiver =
-                    bundle.getPossibleRecipients(question, possibleGiverWithNoResponses);
-            if (isMissingResponsesShown) {
-                responseRows.addAll(
-                        buildMissingResponseRowsBetweenGiverAndPossibleRecipients(
-                                question,
-                                possibleRecipientsForRemainingGiver,
-                                possibleGiverWithNoResponses,
-                                bundle.getFullNameFromRoster(possibleGiverWithNoResponses),
-                                bundle.getTeamNameFromRoster(possibleGiverWithNoResponses)));
-            }
+            giverPanel.setHasResponses(false);
+
+            sectionPanel.addParticipantPanel(teamName, giverPanel);
         }
-
-        return responseRows;
-    }
-
-    private InstructorFeedbackResultsModerationButton
-    buildModerationButtonForExistingResponse(
-            FeedbackQuestionAttributes question,
-            FeedbackResponseAttributes response) {
-        boolean isGiverInstructor = question.giverType == FeedbackParticipantType.INSTRUCTORS;
-        boolean isGiverStudentOrTeam = question.giverType == FeedbackParticipantType.STUDENTS
-                || question.giverType == FeedbackParticipantType.TEAMS;
-
-        if (isGiverStudentOrTeam || isGiverInstructor) {
-            return buildModerationButtonForGiver(question, response.giver, "btn btn-default btn-xs",
-                    MODERATE_SINGLE_RESPONSE);
-        }
-        return null;
     }
 
     /**
-     * Gets moderation button for giver.
-     *
-     * @return <ul>
-     * <li>null if the participant is not visible</li>
-     * <li>a disabled moderation button if the instructor does not have sufficient permissions</li>
-     * <li>a working moderation button otherwise</li>
-     * </ul>
+     * Constructs InstructorFeedbackResultsQuestionTable containing statistics for each team.
+     * The statistics tables are added to the sectionPanel.
      */
-    private InstructorFeedbackResultsModerationButton buildModerationButtonForGiver(
-            FeedbackQuestionAttributes question,
-            String giverIdentifier, String className,
-            String buttonText) {
+    protected void buildTeamsStatisticsTableForSectionPanel(
+            InstructorFeedbackResultsSectionPanel sectionPanel,
+            Map<String, Map<FeedbackQuestionAttributes, List<FeedbackResponseAttributes>>> responsesGroupedByTeam,
+            Set<String> teamsInSection) {
+        Map<String, List<InstructorFeedbackResultsQuestionTable>> teamToStatisticsTables = new HashMap<>();
+        for (String team : teamsInSection) {
+            // skip team if no responses,
+            // or if the team is an anonymous student's team or an anonymous team, or is "-"
+            if (!responsesGroupedByTeam.containsKey(team) || !isTeamVisible(team)) {
+                continue;
+            }
 
-        boolean isGiverInstructorOfCourse = bundle.roster.isInstructorOfCourse(giverIdentifier);
-        boolean isGiverVisibleStudentOrTeam = isTeamVisible(giverIdentifier)
-                || bundle.roster.isStudentInCourse(giverIdentifier);
+            List<InstructorFeedbackResultsQuestionTable> statisticsTablesForTeam = new ArrayList<>();
 
-        if (!isGiverVisibleStudentOrTeam && !isGiverInstructorOfCourse) {
-            return null;
+            for (FeedbackQuestionAttributes question : bundle.questions.values()) {
+                if (!responsesGroupedByTeam.get(team).containsKey(question)) {
+                    continue;
+                }
+
+                List<FeedbackResponseAttributes> responsesForTeamAndQuestion =
+                        responsesGroupedByTeam.get(team).get(question);
+
+                InstructorFeedbackResultsQuestionTable statsTable = buildQuestionTableWithoutResponseRows(
+                        question, responsesForTeamAndQuestion,
+                        "");
+                statsTable.setCollapsible(false);
+
+                if (!statsTable.getQuestionStatisticsTable().isEmpty()) {
+                    statisticsTablesForTeam.add(statsTable);
+                }
+            }
+
+            InstructorFeedbackResultsQuestionTable.sortByQuestionNumber(statisticsTablesForTeam);
+            teamToStatisticsTables.put(team, statisticsTablesForTeam);
         }
 
-        String sectionName = bundle.getSectionFromRoster(giverIdentifier);
-        boolean isAllowedToModerate = isAllowedToModerate(instructor, sectionName, getFeedbackSessionName());
-        boolean isDisabled = !isAllowedToModerate;
-        String moderateFeedbackResponseLink = isGiverInstructorOfCourse
-                ? Const.ActionURIs.INSTRUCTOR_EDIT_INSTRUCTOR_FEEDBACK_PAGE
-                : Const.ActionURIs.INSTRUCTOR_EDIT_STUDENT_FEEDBACK_PAGE;
-        moderateFeedbackResponseLink = addUserIdToUrl(moderateFeedbackResponseLink);
-
-        return new InstructorFeedbackResultsModerationButton(isDisabled, className, giverIdentifier, getCourseId(),
-                getFeedbackSessionName(), question, buttonText,
-                moderateFeedbackResponseLink);
+        sectionPanel.setTeamStatisticsTable(teamToStatisticsTables);
     }
+
+    protected abstract void prepareHeadersForTeamPanelsInSectionPanel(
+            InstructorFeedbackResultsSectionPanel sectionPanel);
+
+    @Override
+    protected abstract void configureResponseRow(
+            String giver, String recipient, InstructorFeedbackResultsResponseRow responseRow);
 
     private InstructorFeedbackResultsGroupByParticipantPanel
     buildInstructorFeedbackResultsGroupBySecondaryParticipantPanel(
@@ -1269,381 +730,21 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
 
         return bySecondaryParticipantPanel;
     }
-    /*
-     * getInstructorFeedbackSessionPublishAndUnpublishAction()
-     * is not covered in action test, but covered in UI tests.
-     */
 
-    private FeedbackSessionPublishButton getInstructorFeedbackSessionPublishAndUnpublishAction() {
-        return new FeedbackSessionPublishButton(this,
-                bundle.feedbackSession,
-                Const.ActionURIs.INSTRUCTOR_FEEDBACK_SESSIONS_PAGE,
-                instructor,
-                "btn-primary btn-block");
+    @Override
+    protected boolean shouldSetAjaxClass() {
+        return false;
     }
 
-    private List<FeedbackResponseCommentRow> buildResponseComments(
-            String giverName, String recipientName,
-            FeedbackQuestionAttributes question, FeedbackResponseAttributes response) {
-        List<FeedbackResponseCommentRow> comments = new ArrayList<>();
-        List<FeedbackResponseCommentAttributes> frcAttributesList = bundle.responseComments.get(response.getId());
-        if (frcAttributesList != null) {
-            for (FeedbackResponseCommentAttributes frcAttributes : frcAttributesList) {
-                comments.add(buildResponseComment(giverName, recipientName, question, response, frcAttributes));
-            }
-        }
-        return comments;
+    @Override
+    protected boolean isQuestionTableCollapsible() {
+        return false;
     }
 
-    private FeedbackResponseCommentRow buildResponseComment(
-            String giverName, String recipientName,
-            FeedbackQuestionAttributes question, FeedbackResponseAttributes response,
-            FeedbackResponseCommentAttributes frcAttributes) {
-        boolean isInstructorGiver = instructor.email.equals(frcAttributes.giverEmail);
-        boolean isInstructorWithPrivilegesToModify =
-                instructor.isAllowedForPrivilege(
-                        response.giverSection, response.feedbackSessionName,
-                        Const.ParamsNames.INSTRUCTOR_PERMISSION_MODIFY_SESSION_COMMENT_IN_SECTIONS)
-                        && instructor.isAllowedForPrivilege(
-                        response.recipientSection, response.feedbackSessionName,
-                        Const.ParamsNames.INSTRUCTOR_PERMISSION_MODIFY_SESSION_COMMENT_IN_SECTIONS);
-        boolean isInstructorAllowedToEditAndDeleteComment = isInstructorGiver || isInstructorWithPrivilegesToModify;
+    @Override
+    protected abstract List<InstructorFeedbackResultsResponseRow> getResponseRows(
+            FeedbackQuestionAttributes question, List<FeedbackResponseAttributes> responses,
+            String participantIdentifier, List<ElementTag> columnTags, Map<String, Boolean> isSortable);
 
-        Map<FeedbackParticipantType, Boolean> responseVisibilityMap = getResponseVisibilityMap(question);
-        String whoCanSeeComment = null;
-        boolean isVisibilityIconShown = false;
-        if (bundle.feedbackSession.isPublished()) {
-            boolean isResponseCommentPublicToRecipient = !frcAttributes.showCommentTo.isEmpty();
-            isVisibilityIconShown = isResponseCommentPublicToRecipient;
-
-            if (isVisibilityIconShown) {
-                whoCanSeeComment = getTypeOfPeopleCanViewComment(frcAttributes, question);
-            }
-        }
-
-        FeedbackResponseCommentRow frc = new FeedbackResponseCommentRow(
-                frcAttributes, frcAttributes.giverEmail, giverName, recipientName,
-                getResponseCommentVisibilityString(frcAttributes, question),
-                getResponseCommentGiverNameVisibilityString(frcAttributes, question),
-                responseVisibilityMap, bundle.instructorEmailNameTable,
-                bundle.getTimeZone());
-        frc.setVisibilityIcon(isVisibilityIconShown, whoCanSeeComment);
-        if (isInstructorAllowedToEditAndDeleteComment) {
-            frc.enableEditDelete();
-        }
-
-        return frc;
-    }
-
-    private FeedbackResponseCommentRow buildFeedbackResponseCommentAddForm(
-            FeedbackQuestionAttributes question,
-            FeedbackResponseAttributes response, Map<FeedbackParticipantType, Boolean> responseVisibilityMap,
-            String giverName, String recipientName) {
-        FeedbackResponseCommentAttributes frca = FeedbackResponseCommentAttributes
-                .builder(question.courseId, question.feedbackSessionName, "", new Text(""))
-                .withFeedbackResponseId(response.getId())
-                .withFeedbackQuestionId(question.getId())
-                .build();
-
-        FeedbackParticipantType[] relevantTypes = {
-                FeedbackParticipantType.GIVER,
-                FeedbackParticipantType.RECEIVER,
-                FeedbackParticipantType.OWN_TEAM_MEMBERS,
-                FeedbackParticipantType.RECEIVER_TEAM_MEMBERS,
-                FeedbackParticipantType.STUDENTS,
-                FeedbackParticipantType.INSTRUCTORS
-        };
-
-        frca.showCommentTo = new ArrayList<>();
-        frca.showGiverNameTo = new ArrayList<>();
-        for (FeedbackParticipantType type : relevantTypes) {
-            if (isResponseCommentVisibleTo(question, type)) {
-                frca.showCommentTo.add(type);
-            }
-            if (isResponseCommentGiverNameVisibleTo(question, type)) {
-                frca.showGiverNameTo.add(type);
-            }
-        }
-
-        return new FeedbackResponseCommentRow(frca, giverName, recipientName,
-                getResponseCommentVisibilityString(question),
-                getResponseCommentGiverNameVisibilityString(question), responseVisibilityMap,
-                bundle.getTimeZone());
-    }
-
-    private Map<FeedbackParticipantType, Boolean> getResponseVisibilityMap(FeedbackQuestionAttributes question) {
-        Map<FeedbackParticipantType, Boolean> responseVisibilityMap = new HashMap<>();
-
-        FeedbackParticipantType[] relevantTypes = {
-                FeedbackParticipantType.GIVER,
-                FeedbackParticipantType.RECEIVER,
-                FeedbackParticipantType.OWN_TEAM_MEMBERS,
-                FeedbackParticipantType.RECEIVER_TEAM_MEMBERS,
-                FeedbackParticipantType.STUDENTS,
-                FeedbackParticipantType.INSTRUCTORS
-        };
-
-        for (FeedbackParticipantType participantType : relevantTypes) {
-            responseVisibilityMap.put(participantType, isResponseVisibleTo(participantType, question));
-        }
-
-        return responseVisibilityMap;
-    }
-
-    //TODO investigate and fix the differences between question.isResponseVisibleTo and this method
-    private boolean isResponseVisibleTo(FeedbackParticipantType participantType, FeedbackQuestionAttributes question) {
-        switch (participantType) {
-            case GIVER:
-                return question.isResponseVisibleTo(FeedbackParticipantType.GIVER);
-            case INSTRUCTORS:
-                return question.isResponseVisibleTo(FeedbackParticipantType.INSTRUCTORS);
-            case OWN_TEAM_MEMBERS:
-                return question.giverType != FeedbackParticipantType.INSTRUCTORS
-                        && question.giverType != FeedbackParticipantType.SELF
-                        && question.isResponseVisibleTo(FeedbackParticipantType.OWN_TEAM_MEMBERS);
-            case RECEIVER:
-                return question.recipientType != FeedbackParticipantType.SELF
-                        && question.recipientType != FeedbackParticipantType.NONE
-                        && question.isResponseVisibleTo(FeedbackParticipantType.RECEIVER);
-            case RECEIVER_TEAM_MEMBERS:
-                return question.recipientType != FeedbackParticipantType.INSTRUCTORS
-                        && question.recipientType != FeedbackParticipantType.SELF
-                        && question.recipientType != FeedbackParticipantType.NONE
-                        && question.isResponseVisibleTo(FeedbackParticipantType.RECEIVER_TEAM_MEMBERS);
-            case STUDENTS:
-                return question.isResponseVisibleTo(FeedbackParticipantType.STUDENTS);
-            default:
-                Assumption.fail("Invalid participant type");
-                return false;
-        }
-    }
-
-    private Map<String, InstructorFeedbackResultsModerationButton> buildModerateButtonsForNoResponsePanel() {
-        Map<String, InstructorFeedbackResultsModerationButton> moderationButtons = new HashMap<>();
-        for (String giverIdentifier : bundle.responseStatus.emailNameTable.keySet()) {
-            boolean isStudent = bundle.isParticipantIdentifierStudent(giverIdentifier);
-
-            if (!isStudent) {
-                continue;
-            }
-
-            String sectionName = bundle.getSectionFromRoster(giverIdentifier);
-            boolean isAllowedToModerate = isAllowedToModerate(instructor, sectionName, feedbackSessionName);
-            String moderateFeedbackLink = addUserIdToUrl(Const.ActionURIs.INSTRUCTOR_EDIT_STUDENT_FEEDBACK_PAGE);
-
-            InstructorFeedbackResultsModerationButton moderationButton =
-                    new InstructorFeedbackResultsModerationButton(!isAllowedToModerate, "btn btn-default btn-xs",
-                            giverIdentifier,
-                            bundle.feedbackSession.getCourseId(),
-                            bundle.feedbackSession.getFeedbackSessionName(),
-                            null, "Submit Responses", moderateFeedbackLink);
-            moderationButtons.put(giverIdentifier, moderationButton);
-
-        }
-
-        return moderationButtons;
-    }
-
-    private InstructorFeedbackResultsRemindButton buildRemindButtonForNoResponsePanel() {
-
-        boolean isSessionClosed = bundle.getFeedbackSession().isClosed();
-        String actionLink = addUserIdToUrl(Const.ActionURIs.INSTRUCTOR_FEEDBACK_REMIND_PARTICULAR_STUDENTS_PAGE);
-        actionLink = Url.addParamToUrl(actionLink, Const.ParamsNames.COURSE_ID, bundle.feedbackSession.getCourseId());
-        actionLink = Url.addParamToUrl(actionLink, Const.ParamsNames.FEEDBACK_SESSION_NAME,
-                bundle.feedbackSession.getFeedbackSessionName());
-        actionLink = addSessionTokenToUrl(actionLink);
-
-        return new InstructorFeedbackResultsRemindButton(isSessionClosed,
-                "btn btn-default btn-xs btn-tm-actions remind-btn-no-response",
-                bundle.feedbackSession.getCourseId(),
-                bundle.feedbackSession.getFeedbackSessionName(),
-                "Remind All", actionLink);
-    }
-
-    private String getRemindParticularStudentsLink() {
-        String remindParticularStudentsLink = Const.ActionURIs.INSTRUCTOR_FEEDBACK_REMIND_PARTICULAR_STUDENTS;
-
-        String nextUrl = addUserIdToUrl(Const.ActionURIs.INSTRUCTOR_FEEDBACK_RESULTS_PAGE);
-        nextUrl = Url.addParamToUrl(nextUrl, Const.ParamsNames.COURSE_ID, bundle.feedbackSession.getCourseId());
-        nextUrl = Url.addParamToUrl(nextUrl, Const.ParamsNames.FEEDBACK_SESSION_NAME,
-                bundle.feedbackSession.getFeedbackSessionName());
-        remindParticularStudentsLink = Url.addParamToUrl(remindParticularStudentsLink, Const.ParamsNames.NEXT_URL,
-                nextUrl);
-        remindParticularStudentsLink = addSessionTokenToUrl(remindParticularStudentsLink);
-        return remindParticularStudentsLink;
-    }
-
-    public void setBundle(FeedbackSessionResultsBundle bundle) {
-        this.bundle = bundle;
-    }
-
-    public FeedbackSessionResultsBundle getBundle() {
-        return bundle;
-    }
-
-    public InstructorAttributes getInstructor() {
-        return instructor;
-    }
-
-    public List<String> getSections() {
-        return sections;
-    }
-
-    public String getSelectedSection() {
-        return selectedSection;
-    }
-
-    public String getSortType() {
-        return sortType;
-    }
-
-    @Deprecated
-    public String getGroupByTeam() {
-        return groupByTeam == null ? "null" : groupByTeam;
-    }
-
-    // TODO: swap groupByTeam to a normal boolean
-    public boolean isGroupedByTeam() {
-        return "on".equals(groupByTeam);
-    }
-
-    // TODO: swap showStats to a normal boolean
-    private boolean isStatsShown() {
-        return showStats != null;
-    }
-
-    public boolean isMissingResponsesShown() {
-        return isMissingResponsesShown;
-    }
-
-    public int getStartIndex() {
-        return startIndex;
-    }
-
-    public String getCourseId() {
-        return displayableCourseId;
-    }
-
-    public String getFeedbackSessionName() {
-        return displayableFsName;
-    }
-
-    public String getAjaxStatus() {
-        return ajaxStatus;
-    }
-
-    public String getSessionResultsHtmlTableAsString() {
-        return sessionResultsHtmlTableAsString;
-    }
-
-    public List<InstructorFeedbackResultsQuestionTable> getQuestionPanels() {
-        return questionPanels;
-    }
-
-    public Map<String, InstructorFeedbackResultsSectionPanel> getSectionPanels() {
-        return sectionPanels;
-    }
-
-    private String getInstructorFeedbackSessionEditLink() {
-        return instructor.isAllowedForPrivilege(Const.ParamsNames.INSTRUCTOR_PERMISSION_MODIFY_SESSION)
-                ? getInstructorFeedbackEditLink(bundle.feedbackSession.getCourseId(),
-                bundle.feedbackSession.getFeedbackSessionName(), true)
-                : null;
-    }
-
-    private String getInstructorFeedbackSessionResultsLink() {
-        return getInstructorFeedbackResultsLink(bundle.feedbackSession.getCourseId(),
-                bundle.feedbackSession.getFeedbackSessionName());
-    }
-
-    private boolean isAllowedToModerate(
-            InstructorAttributes instructor, String sectionName, String feedbackSessionName) {
-        return instructor.isAllowedForPrivilege(sectionName, feedbackSessionName,
-                Const.ParamsNames.INSTRUCTOR_PERMISSION_MODIFY_SESSION_COMMENT_IN_SECTIONS);
-    }
-
-    public boolean isAllSectionsSelected() {
-        return "All".equals(selectedSection);
-    }
-
-    // TODO: place below getter methods for template objects in some init method common to all views
-    public InstructorFeedbackResultsSessionPanel getSessionPanel() {
-        return new InstructorFeedbackResultsSessionPanel(
-                bundle.feedbackSession, getInstructorFeedbackSessionEditLink(),
-                getInstructorFeedbackSessionPublishAndUnpublishAction(), selectedSection,
-                isMissingResponsesShown, isStatsShown());
-    }
-
-    public InstructorFeedbackResultsFilterPanel getFilterPanel() {
-        return new InstructorFeedbackResultsFilterPanel(
-                isStatsShown(), bundle.feedbackSession, isAllSectionsSelected(), selectedSection,
-                isGroupedByTeam(), sortType, getInstructorFeedbackSessionResultsLink(),
-                getSections(), isMissingResponsesShown);
-    }
-
-    public InstructorFeedbackResultsNoResponsePanel getNoResponsePanel() {
-        return new InstructorFeedbackResultsNoResponsePanel(bundle.responseStatus,
-                buildModerateButtonsForNoResponsePanel(),
-                buildRemindButtonForNoResponsePanel(),
-                getRemindParticularStudentsLink());
-    }
-
-    public void setStartIndex(int startIndex) {
-        this.startIndex = startIndex;
-    }
-
-    public void setAjaxStatus(String ajaxStatus) {
-        this.ajaxStatus = ajaxStatus;
-    }
-
-    public void setSessionResultsHtmlTableAsString(String sessionResultsHtmlTableAsString) {
-        this.sessionResultsHtmlTableAsString = sessionResultsHtmlTableAsString;
-    }
-
-    public boolean isLargeNumberOfResponses() {
-        boolean isQuestionViewType = viewType == InstructorFeedbackResultsPageViewType.QUESTION;
-        return isQuestionViewType && isLargeNumberOfRespondents() && isAllSectionsSelected()
-                || !bundle.isComplete;
-    }
-
-    public boolean isLargeNumberOfRespondents() {
-        int numRespondents = bundle.feedbackSession.getRespondingInstructorList().size()
-                + bundle.feedbackSession.getRespondingStudentList().size();
-        return isLargeNumberOfRespondents
-                || numRespondents > RESPONDENTS_LIMIT_FOR_AUTOLOADING;
-    }
-
-    // Only used for testing the ui
-    public void setLargeNumberOfRespondents(boolean needAjax) {
-        this.isLargeNumberOfRespondents = needAjax;
-    }
-
-    private int generateIndexForUser(String name, int index, Map<String, Integer> userIndexesForComments) {
-        userIndexesForComments.put(name, index + 1);
-        return index + 1;
-    }
-
-    /**
-     * Checks if there are entities in No Specific Section.
-     *
-     * <ul>
-     * <li>true if the course has teams in Default Section</li>
-     * <li>true if view is GRQ or GQR and there is feedback from Instructors</li>
-     * <li>true if view is RGQ or RQG and there is General Feedback or Feedback to Instructors</li>
-     * <li>false otherwise</li>
-     * </ul>
-     */
-    private boolean hasEntitiesInNoSpecificSection(InstructorFeedbackResultsPageViewType viewType) {
-        boolean hasFeedbackFromInstructor = bundle.hasResponseFromInstructor();
-        boolean hasFeedbackToInstructorOrGeneral = bundle.hasResponseToInstructorOrGeneral();
-        boolean viewTypeIsRecipient = viewType == InstructorFeedbackResultsPageViewType.RECIPIENT_QUESTION_GIVER
-                || viewType == InstructorFeedbackResultsPageViewType.RECIPIENT_GIVER_QUESTION;
-        boolean viewTypeIsGiver = viewType == InstructorFeedbackResultsPageViewType.GIVER_QUESTION_RECIPIENT
-                || viewType == InstructorFeedbackResultsPageViewType.GIVER_RECIPIENT_QUESTION;
-        boolean hasTeamsInNoSection = bundle.getTeamsInSectionFromRoster(Const.DEFAULT_SECTION).size() > 0;
-
-        return hasTeamsInNoSection
-                || viewTypeIsGiver && hasFeedbackFromInstructor
-                || viewTypeIsRecipient && hasFeedbackToInstructorOrGeneral;
-    }
+    protected abstract boolean hasEntitiesInNoSpecificSection();
 }

@@ -138,7 +138,8 @@ public class InstructorFeedbackResultsPageAction extends Action {
         return createShowPageResult(viewURI, data);
     }
 
-    private FeedbackSessionResultsBundle getFeedbackSessionResultsBundle(String courseId, String feedbackSessionName,
+    private FeedbackSessionResultsBundle getFeedbackSessionResultsBundle(
+            String courseId, String feedbackSessionName,
             InstructorAttributes instructor, InstructorFeedbackResultsPageData data, String selectedSection,
             String sortType, String questionId, String isTestingAjax) throws EntityDoesNotExistException {
         FeedbackSessionResultsBundle bundle = null;
@@ -175,7 +176,8 @@ public class InstructorFeedbackResultsPageAction extends Action {
         return bundle;
     }
 
-    private FeedbackSessionResultsBundle getFeedbackSessionResultsBundleForQuestionSortType(String courseId,
+    private FeedbackSessionResultsBundle getFeedbackSessionResultsBundleForQuestionSortType(
+            String courseId,
             String feedbackSessionName, InstructorAttributes instructor, InstructorFeedbackResultsPageData data,
             String selectedSection, String sortType, String questionId, String isTestingAjax)
             throws EntityDoesNotExistException {
@@ -212,7 +214,8 @@ public class InstructorFeedbackResultsPageAction extends Action {
         return bundle;
     }
 
-    private ActionResult createAjaxResultForCsvTableLoadedInHtml(String courseId, String feedbackSessionName,
+    private ActionResult createAjaxResultForCsvTableLoadedInHtml(
+            String courseId, String feedbackSessionName,
             InstructorAttributes instructor, String selectedSection, boolean isMissingResponsesShown,
             boolean isStatsShown) throws EntityDoesNotExistException {
 
