@@ -2,6 +2,7 @@ package teammates.ui.pagedata;
 
 import teammates.common.datatransfer.attributes.*;
 import teammates.common.util.*;
+import teammates.ui.datatransfer.InstructorFeedbackResultsPageViewType;
 import teammates.ui.template.ElementTag;
 import teammates.ui.template.InstructorFeedbackResultsResponseRow;
 import teammates.ui.template.InstructorFeedbackResultsSectionPanel;
@@ -14,6 +15,9 @@ public class InstructorFeedbackResultsPageDataBySectionGiverQuestionRecipient
     public InstructorFeedbackResultsPageDataBySectionGiverQuestionRecipient(
             AccountAttributes account, String sessionToken) {
         super(account, sessionToken);
+
+        viewType = InstructorFeedbackResultsPageViewType.GIVER_QUESTION_RECIPIENT;
+        sortType = viewType.toString();
     }
 
     protected void initializeForSectionViewType(String selectedSection) {

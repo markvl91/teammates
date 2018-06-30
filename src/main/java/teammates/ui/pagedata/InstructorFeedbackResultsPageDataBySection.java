@@ -4,7 +4,6 @@ import teammates.common.datatransfer.FeedbackParticipantType;
 import teammates.common.datatransfer.attributes.*;
 import teammates.common.datatransfer.questions.FeedbackQuestionDetails;
 import teammates.common.util.*;
-import teammates.ui.datatransfer.InstructorFeedbackResultsPageViewType;
 import teammates.ui.template.*;
 
 import java.util.*;
@@ -12,6 +11,7 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 
 public abstract class InstructorFeedbackResultsPageDataBySection extends InstructorFeedbackResultsPageDataByQuestion {
+
     public InstructorFeedbackResultsPageDataBySection(AccountAttributes account, String sessionToken) {
         super(account, sessionToken);
     }
@@ -30,10 +30,10 @@ public abstract class InstructorFeedbackResultsPageDataBySection extends Instruc
     public void initialize(
             InstructorAttributes instructor,
             String selectedSection, String showStats,
-            String groupByTeam, InstructorFeedbackResultsPageViewType view,
+            String groupByTeam,
             boolean isMissingResponsesShown) {
         initCommonVariables(instructor, selectedSection, showStats, groupByTeam,
-                isMissingResponsesShown, view);
+                isMissingResponsesShown);
 
         // results page to be loaded by ajax
         if (isAllSectionsSelected()) {

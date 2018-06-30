@@ -79,19 +79,16 @@ public class InstructorFeedbackResultsPageData extends PageData {
     public void initialize(
             InstructorAttributes instructor,
             String selectedSection, String showStats,
-            String groupByTeam, InstructorFeedbackResultsPageViewType view,
+            String groupByTeam,
             boolean isMissingResponsesShown) {
         // Nothing to initialize
     }
 
     protected void initCommonVariables(
             InstructorAttributes instructor, String selectedSection,
-            String showStats, String groupByTeam, boolean isMissingResponsesShown,
-            InstructorFeedbackResultsPageViewType viewType) {
+            String showStats, String groupByTeam, boolean isMissingResponsesShown) {
 
         Assumption.assertNotNull(bundle);
-        this.viewType = viewType;
-        this.sortType = viewType.toString();
 
         this.instructor = instructor;
         this.selectedSection = selectedSection;

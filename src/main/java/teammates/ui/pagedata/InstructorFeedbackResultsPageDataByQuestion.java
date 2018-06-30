@@ -14,6 +14,9 @@ public class InstructorFeedbackResultsPageDataByQuestion extends InstructorFeedb
 
     public InstructorFeedbackResultsPageDataByQuestion(AccountAttributes account, String sessionToken) {
         super(account, sessionToken);
+
+        viewType = InstructorFeedbackResultsPageViewType.QUESTION;
+        sortType = viewType.toString();
     }
 
     /**
@@ -25,8 +28,8 @@ public class InstructorFeedbackResultsPageDataByQuestion extends InstructorFeedb
     public void initialize(
             InstructorAttributes instructor,
             String selectedSection, String showStats,
-            String groupByTeam, InstructorFeedbackResultsPageViewType view, boolean isMissingResponsesShown) {
-        initCommonVariables(instructor, selectedSection, showStats, groupByTeam, isMissingResponsesShown, view);
+            String groupByTeam, boolean isMissingResponsesShown) {
+        initCommonVariables(instructor, selectedSection, showStats, groupByTeam, isMissingResponsesShown);
 
         Map<FeedbackQuestionAttributes, List<FeedbackResponseAttributes>> questionToResponseMap =
                 bundle.getQuestionResponseMap();

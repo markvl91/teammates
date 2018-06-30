@@ -10,7 +10,6 @@ import teammates.common.util.Const;
 import teammates.common.util.StatusMessage;
 import teammates.common.util.StatusMessageColor;
 import teammates.common.util.StringHelper;
-import teammates.ui.datatransfer.InstructorFeedbackResultsPageViewType;
 import teammates.ui.pagedata.*;
 
 public class InstructorFeedbackResultsPageAction extends Action {
@@ -68,32 +67,26 @@ public class InstructorFeedbackResultsPageAction extends Action {
 
         InstructorFeedbackResultsPageData data;
         String viewURI;
-        InstructorFeedbackResultsPageViewType viewType;
 
         switch (sortType) {
             case Const.FeedbackSessionResults.GRQ_SORT_TYPE:
-                viewType = InstructorFeedbackResultsPageViewType.GIVER_RECIPIENT_QUESTION;
                 data = new InstructorFeedbackResultsPageDataBySectionGiverRecipientQuestion(account, sessionToken);
                 viewURI = Const.ViewURIs.INSTRUCTOR_FEEDBACK_RESULTS_BY_GIVER_RECIPIENT_QUESTION;
                 break;
             case Const.FeedbackSessionResults.RQG_SORT_TYPE:
-                viewType = InstructorFeedbackResultsPageViewType.RECIPIENT_QUESTION_GIVER;
                 data = new InstructorFeedbackResultsPageDataBySectionRecipientQuestionGiver(account, sessionToken);
                 viewURI = Const.ViewURIs.INSTRUCTOR_FEEDBACK_RESULTS_BY_RECIPIENT_QUESTION_GIVER;
                 break;
             case Const.FeedbackSessionResults.GQR_SORT_TYPE:
-                viewType = InstructorFeedbackResultsPageViewType.GIVER_QUESTION_RECIPIENT;
                 data = new InstructorFeedbackResultsPageDataBySectionGiverQuestionRecipient(account, sessionToken);
                 viewURI = Const.ViewURIs.INSTRUCTOR_FEEDBACK_RESULTS_BY_GIVER_QUESTION_RECIPIENT;
                 break;
             case Const.FeedbackSessionResults.QUESTION_SORT_TYPE:
-                viewType = InstructorFeedbackResultsPageViewType.QUESTION;
                 data = new InstructorFeedbackResultsPageDataByQuestion(account, sessionToken);
                 viewURI = Const.ViewURIs.INSTRUCTOR_FEEDBACK_RESULTS_BY_QUESTION;
                 break;
             case Const.FeedbackSessionResults.RGQ_SORT_TYPE:
             default:
-                viewType = InstructorFeedbackResultsPageViewType.RECIPIENT_GIVER_QUESTION;
                 data = new InstructorFeedbackResultsPageDataBySectionRecipientGiverQuestion(account, sessionToken);
                 viewURI = Const.ViewURIs.INSTRUCTOR_FEEDBACK_RESULTS_BY_RECIPIENT_GIVER_QUESTION;
                 break;
@@ -133,7 +126,7 @@ public class InstructorFeedbackResultsPageAction extends Action {
             isError = true;
         }
 
-        data.initialize(instructor, selectedSection, showStats, groupByTeam, viewType, isMissingResponsesShown);
+        data.initialize(instructor, selectedSection, showStats, groupByTeam, isMissingResponsesShown);
 
         return createShowPageResult(viewURI, data);
     }
